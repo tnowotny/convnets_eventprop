@@ -37,7 +37,7 @@ ALPHABETS = None
 AUG = {"rotate": (-10.0,10.0),
        "shift": (-15, 15)
        }
-SHOW_AUGMENTAION_EXAMPLE = False
+SHOW_AUGMENTAION_EXAMPLE = True
 
 images, labels, alph_ids, char_ids = utils.load_omniglot("train") if TRAIN else load_omniglot("test")
 if TRAIN:

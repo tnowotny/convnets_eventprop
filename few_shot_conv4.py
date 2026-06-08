@@ -22,9 +22,7 @@ BATCH_SIZE = 32
 NUM_EPOCHS = 2000
 EXAMPLE_TIME = 25.0
 DT = 1.0
-TRAIN = True
 KERNEL_PROFILING = False
-PLOT_EPOCHS = 50
 HIDDEN_LAYERS = 4
 NUM_HIDDEN = [ 128, 64, 64, 64 ]
 KERNEL_SZ = [ 3, 3, 3, 3 ]
@@ -32,11 +30,6 @@ CONV_STRIDES = [ 2, 1, 1, 1 ]
 HID_MEAN = [ 1.0, 0.0, 0.0, 0.0 ]
 HID_SD = [3.0, 1.0, 1.0, 1.0 ]
 LR = [2e-2, 2e-3, 2e-3, 2e-3, ]
-ALPHABETS = None
-AUG = {"rotate": (-10.0,10.0),
-       "shift": (-15, 15)
-       }
-SHOW_AUGMENTAION_EXAMPLE = False
 N_WAY = 5
 K_SHOT = 5
 

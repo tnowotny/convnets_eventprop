@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow_datasets as tfds
-import tensorflow as tf
 import cv2
 
 def show_filters(w, fshape):
@@ -152,13 +151,9 @@ def load_omniglot(split="train"):
     # Convert TFDS tensors to numpy
     for x in ds.as_numpy_iterator():
         alph_id = int(x["alphabet"])
-        img = x["image"]
-        img = tf.image.convert_image_dtype(img, tf.float32)
-        img = tf.image.rgb_to_grayscale(img)
-        #img = tf.image.resize(img, [28, 28])
-        mn, mx = tf.reduce_min(img), tf.reduce_max(img)
-        img = tf.where(mx > mn, (img - mn) / (mx - mn), img)
-        img = tf.clip_by_value(1.0-img, 0.0, 1.0)*255
+        img = np.asarray(x["image"])
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+        img = 255 - img
         images.append(img)
         labels.append(x["label"])
         alph_ids.append(alph_id)
