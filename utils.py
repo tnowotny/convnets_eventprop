@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow_datasets as tfds
 import tensorflow as tf
+import cv2
 
 def show_filters(w, fshape):
     fh, fw = fshape
@@ -88,6 +89,21 @@ def spike_raster(cb_data, key, trials= None):
     fig.suptitle(f"layer {key}")
     return fig
 
+def spike_stats(layer, cb_data, key):
+    ids = cb_data[key][1]
+    shape = layer.population().shape
+    n_neuron = np.prod(shape)
+    n_trial = shape[0]
+    spkn = []
+    for b in range(len(ids)):
+        spkn.append(np.histogram(ids[b],bins= n_neuron, range=(0.0,n_neuron))[0])
+    spkn = np.asarray(spkn)
+    meanspike = np.mean(np.mean(spkn))
+    sigspike = np.mean(np.std(np.mean(spkn,axis=1)))
+    Nall = np.mean(np.sum(spkn,axis=1))
+    Nallsig = np.std(np.sum(spkn,axis=1))
+    return meanspike, sigspike, Nall, Nallsig
+
 def plot_var(d, trials= None):
     if trials is None:
         trials= list(range(len(d)))
@@ -139,7 +155,7 @@ def load_omniglot(split="train"):
         img = x["image"]
         img = tf.image.convert_image_dtype(img, tf.float32)
         img = tf.image.rgb_to_grayscale(img)
-        img = tf.image.resize(img, [28, 28])
+        #img = tf.image.resize(img, [28, 28])
         mn, mx = tf.reduce_min(img), tf.reduce_max(img)
         img = tf.where(mx > mn, (img - mn) / (mx - mn), img)
         img = tf.clip_by_value(1.0-img, 0.0, 1.0)*255
@@ -151,7 +167,7 @@ def load_omniglot(split="train"):
     print(f"[Omniglot] Loaded {len(images)} samples from {split}")
     print(f"           Classes={len(np.unique(labels))}")
     print(images[0].shape)
-    return images, labels, alph_ids, char_ids
+    return np.asarray(images), labels, alph_ids, char_ids
 
 
 def stratified_split(images, labels, alph_ids, alphabets = None, val_split=0.1):
@@ -179,6 +195,29 @@ def stratified_split(images, labels, alph_ids, alphabets = None, val_split=0.1):
         train_idx.extend(idx[n_val:])
     return img[train_idx], lbl[train_idx], img[val_idx], lbl[val_idx]
 
+def augment(images, aug):
+    new_img = np.squeeze(images.copy())
+    shape = new_img[0].shape
+    rot = aug.get("rotate")
+    if rot is not None:
+        image_center = tuple(np.array(new_img[0].shape[1::-1]) / 2)
+        for i, img in enumerate(new_img):
+            angle = np.random.uniform(rot[0], rot[1])
+            rot_mat = cv2.getRotationMatrix2D(image_center, angle, 1.0)
+            new_img[i] = cv2.warpAffine(img, rot_mat, shape[1::-1], flags=cv2.INTER_LINEAR)
+    shift = aug.get("shift")
+    if shift is not None:
+        for i,img in enumerate(new_img):
+            the_shift = np.random.uniform(shift[0],shift[1],2)
+            shift_mat = np.asarray([[ 1, 0, the_shift[0]], [ 0, 1, the_shift[1]]])
+            new_img[i] = cv2.warpAffine(img, shift_mat, shape[1::-1])
+    return np.expand_dims(new_img, axis=-1)
+
+def rescale(images):
+    new_img = []
+    for img in images:
+        new_img.append(cv2.resize(img, (28,28), interpolation=cv2.INTER_LINEAR))
+    return np.expand_dims(np.asarray(new_img),axis=-1)
 
 def show_examples(images, labels, the_label):
     img = np.asarray(images)[np.asarray(labels) == the_label]
@@ -213,3 +252,90 @@ def show_examples(images, labels, the_label):
                 the_ax.imshow(img[id])
             else:
                 the_ax.set_visible(False)
+
+
+def predictions_from_vAvg(vAvg):
+    vAvg = np.asarray(vAvg)
+    print(vAvg.shape)
+    preds = np.argmax(vAvg[:,-1:,:],axis=-1)
+    print(preds.shape)
+    return np.squeeze(preds)
+
+
+def extract_embeddings(compiled_net, input, test_img, layer):
+    """Load final checkpoint, run inference, return membrane voltage embeddings."""
+    print(f"Extracting embeddings")
+    with compiled_net:
+        print("loaded")
+        n_batches = int(np.ceil(len(test_img) / BATCH_SIZE))
+        all_embeddings = []
+        pops = compiled_net.genn_model.neuron_populations
+        the_pop = pops[layer.population()]
+        for batch_idx, start in enumerate(range(0, len(test_img), BATCH_SIZE)):
+            batch_img = test_img[start : start + BATCH_SIZE]
+            n = len(batch_img)
+            print("predicting")
+            compiled_net.predict({input: batch_img})
+            the_pop["v"].pull_from_device()
+            all_embeedings.append(the_pop["v"].values())
+        embeddings = np.concatenate(all_embeddings, axis=0)
+        norms = np.linalg.norm(embeddings, axis=1)
+        print(f"Done: shape {embeddings.shape}, "
+              f"norm mean={norms.mean():.3f} std={norms.std():.3f} "
+              f"min={norms.min():.3f} max={norms.max():.3f}")
+    return embeddings
+
+
+def l2_normalise(embeddings):
+    """L2-normalise each row to unit length."""
+    norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+    norms = np.where(norms == 0, 1.0, norms)
+    return embeddings / norms
+
+
+def sample_episode(embeddings, labels, n_way, k_shot):
+    """Sample N_WAY classes, K_SHOT support and the rest query images each."""
+    classes = np.random.choice(np.unique(labels), n_way, replace=False)
+    sup_emb, sup_lb = [], []
+    qry_emb, qry_lb = [], []
+    for new_lbl, cls in enumerate(classes):
+        idx = np.where(labels == cls)[0]
+        sup_emb.append(embeddings[idx[:k_shot]])
+        sup_lb += [new_lbl] * k_shot
+        qry_emb.append(embeddings[idx[k_shot:]])
+        qry_lb += [new_lbl] * len(qry_emb)
+
+    return sup_emb, np.array(sup_lb), qry_emb, np.array(qry_lb)
+
+
+def run_episode(embeddings, labels, n_way, k_shot):
+    """One episode: Euclidean nearest-centroid classifier."""
+    sup_emb, sup_lb, qry_emb, qry_lb = sample_episode(embeddings, labels,n_way, k_shot)
+    prototypes = np.array([sup_emb[sup_lb == c].mean(0) for c in range(N_WAY)])
+    dists = ((qry_emb[:, None] - prototypes[None]) ** 2).sum(-1)
+    return (np.argmin(dists, axis=1) == qry_lb).mean()
+
+
+def run_episode_linear(embeddings, labels, n_way, k_shot):
+    """One episode: logistic regression fitted on support embeddings."""
+    sup_emb, sup_lb, qry_emb, qry_lb = sample_episode(embeddings, labels, n_way, k_shot)
+    # StandardScaler is important: high-dim embeddings make L-BFGS slow otherwise
+    scaler = StandardScaler()
+    sup_emb = scaler.fit_transform(sup_emb)
+    qry_emb = scaler.transform(qry_emb)
+
+    clf = LogisticRegression(max_iter=5000, C=1.0, solver="lbfgs")
+    clf.fit(sup_emb, sup_lb)
+    return (clf.predict(qry_emb) == qry_lb).mean()
+
+
+def run_episode_cosine(embeddings, labels, n_way, k_shot):
+    """One episode: cosine nearest-centroid (per-episode L2 normalisation)."""
+    sup_emb, sup_lb, qry_emb, qry_lb = sample_episode(embeddings, labels, n_way, k_shot)
+
+    sup_emb = sup_emb / np.maximum(np.linalg.norm(sup_emb, axis=1, keepdims=True), 1e-8)
+    qry_emb = qry_emb / np.maximum(np.linalg.norm(qry_emb, axis=1, keepdims=True), 1e-8)
+
+    prototypes = np.array([sup_emb[sup_lb == c].mean(0) for c in range(n_way)])
+    dists = ((qry_emb[:, None] - prototypes[None]) ** 2).sum(-1)
+    return (np.argmin(dists, axis=1) == qry_lb).mean()
