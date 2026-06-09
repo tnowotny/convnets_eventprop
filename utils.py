@@ -4,6 +4,7 @@ import tensorflow_datasets as tfds
 import cv2
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
+from ml_genn.callbacks import VarRecorder
 
 def show_filters(w, fshape):
     fh, fw = fshape
@@ -274,7 +275,7 @@ def predictions_from_vAvg(vAvg):
 
 
 def extract_embeddings(compiled_net, input, output, test_img, layer, batch_size, var):
-    """Load final checkpoint, run inference, return membrane voltage embeddings."""
+    """run inference, return membrane voltage embeddings."""
     print(f"Extracting embeddings")
     with compiled_net:
         n_batches = int(np.ceil(len(test_img) / batch_size))
@@ -294,6 +295,26 @@ def extract_embeddings(compiled_net, input, output, test_img, layer, batch_size,
               f"min={norms.min():.3f} max={norms.max():.3f}")
     return embeddings
 
+def extract_detailed_embeddings(compiled_net, input, output, test_img, layer, batch_size, var):
+    """run inference with VarRecorder, return membrane voltage traces embeddings."""
+    print(f"Extracting detailed embeddings")
+    with compiled_net:
+        n_batches = int(np.ceil(len(test_img) / batch_size))
+        all_embeddings = []
+        callbacks = [ VarRecorder(layer, "v", "v_emb")]
+        for batch_idx, start in enumerate(range(0, len(test_img), batch_size)):
+            batch_img = test_img[start : start + batch_size]
+            n = len(batch_img)
+            metrics, cb_data = compiled_net.evaluate({input: batch_img},{output: np.zeros(batch_img.shape[0])},callbacks=callbacks)
+            all_embeddings.extend(cb_data["v_emb"])
+        embeddings = np.asarray(all_embeddings)
+        embeddings = embeddings.reshape((-1,embeddings.shape[1]*embeddings.shape[2]))
+        print(embeddings.shape)
+        norms = np.linalg.norm(embeddings, axis=1)
+        print(f"Done: shape {embeddings.shape}, "
+              f"norm mean={norms.mean():.3f} std={norms.std():.3f} "
+              f"min={norms.min():.3f} max={norms.max():.3f}")
+    return embeddings
 
 def l2_normalise(embeddings):
     """L2-normalise each row to unit length."""
@@ -348,3 +369,22 @@ def run_episode_cosine(embeddings, labels, n_way, k_shot):
     prototypes = np.array([sup_emb[sup_lb == c].mean(0) for c in range(n_way)])
     dists = ((qry_emb[:, None] - prototypes[None]) ** 2).sum(-1)
     return (np.argmin(dists, axis=1) == qry_lb).mean()
+
+def ninety_degree_augmentation(img, lbl):
+    img = [ i for i in img ]
+    lbl_offset = np.max(lbl)+1
+    lbl = lbl.tolist()
+    new_img = []
+    new_lbl = []
+    shape = img[0].shape
+    image_center = tuple(np.array(shape[1::-1]) / 2)  
+    for r in range(3):
+        angle = (r+1)*90
+        rot_mat = cv2.getRotationMatrix2D(image_center, angle, 1.0)
+        off = (r+1)*lbl_offset
+        for l, i in zip(lbl, img):
+            new_img.append(cv2.warpAffine(i, rot_mat, shape[1::-1], flags=cv2.INTER_LINEAR))
+            new_lbl.append(off+l)
+    return np.asarray(img+new_img), np.asarray(lbl+new_lbl)
+    
+    

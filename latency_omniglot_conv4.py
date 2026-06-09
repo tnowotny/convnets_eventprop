@@ -39,12 +39,13 @@ p = {
        "shift": (-15, 15)
        },
     "SHOW_AUGMENTAION_EXAMPLE": False,
-    "REG_STRENGTH":(1e-5,1e-6),
+    "REG_STRENGTH":(1e-4,1e-6),
     "REG_TARGET": 0.1,
-    "NAME": "conv4_test_2",
+    "NAME": "conv4_test_4",
     "SHUFFLE": True,
     "RECORD_CONFUSION": False,
-    "HEADLESS": True
+    "HEADLESS": True,
+    "TRAINING_ROTATION": True
 }
 
 if len(sys.argv) > 1:
@@ -62,6 +63,10 @@ with open(f"{p['NAME']}_run.json","w") as f:
 
 images, labels, alph_ids, char_ids = utils.load_omniglot("train") 
 train_img, train_labels, val_img, val_labels = utils.stratified_split(images, labels, alph_ids, p["ALPHABETS"])
+if p["TRAINING_ROTATION"]:
+    train_img, train_labels = utils.ninety_degree_augmentation(train_img, train_labels)
+    val_img, val_labels = utils.ninety_degree_augmentation(val_img, val_labels)
+    
 val_img = utils.rescale(val_img)
     
 serialiser = Numpy(f"{p['NAME']}_checkpoints")
@@ -103,6 +108,7 @@ with compiled_net:
         val_callbacks.append(VarRecorder(output,"vAvg","outvavg"))
     for nh in range(p["HIDDEN_LAYERS"]):
         callbacks.append(SpikeRecorder(hidden[nh], f"shid{nh}",example_filter=[ 1, 500, 1000, 1500 ]))
+    val_best = 0.0
     for e in range(p["NUM_EPOCHS"]):
         the_img = utils.augment(train_img, p["AUG"])
         the_img = utils.rescale(the_img)
@@ -121,7 +127,10 @@ with compiled_net:
                                                                                   callbacks=callbacks,
                                                                                   validation_callbacks= val_callbacks)
         print(f"{metrics[output].result} {val_metrics[output].result}")
-        compiled_net.save((0,),serialiser)
+        if val_metrics[output].result > val_best:
+            # save network with best validation accuracy
+            val_best = val_metrics[output].result
+            compiled_net.save((0,),serialiser)
         if not p["HEADLESS"] and e % p["PLOT_EPOCHS"] == 0:
             if p["RECORD_CONFUSION"]:
                 for (cbdata, lbls) in zip([cb_data, val_cb_data],[train_labels, val_labels]):
@@ -143,7 +152,7 @@ with compiled_net:
                 utils.plot_var(grad[-1]) 
                 utils.spike_raster(cb_data, f"shid{nh}")
             plt.show()
-        with open(f"p['NAME']_results.txt","a") as f:
+        with open(f"{p['NAME']}_results.txt","a") as f:
             for nh in range(p["HIDDEN_LAYERS"]):
                 smean,ssig,sallmean,sallsig = utils.spike_stats(hidden[nh],cb_data,f"shid{nh}")
                 f.write(f"{smean} {ssig} {sallmean} {sallsig} ")

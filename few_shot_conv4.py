@@ -32,8 +32,12 @@ p = {
     "HID_SD": [3.0, 1.0, 1.0, 1.0 ],
     "N_WAY": 20,
     "K_SHOT": 5,
-    "EMBEDDING_NAME": "conv4_test_2_checkpoints"
+    "EMBEDDING_NAME": "conv4_test_4_checkpoints",
+    "TRAINING_ROTATION": True
 }
+
+if p["TRAINING_ROTATION"]:
+    p["NUM_OUTPUT"] *= 4
 
 images, test_labels, alph_ids, char_ids = utils.load_omniglot("test")
 test_img = utils.rescale(images)
@@ -67,21 +71,21 @@ compiled_net = compiler.compile(network)
 embeddings = utils.extract_embeddings(compiled_net, input, output, test_img,"output",p["BATCH_SIZE"],"v")
 embeddings = utils.l2_normalise(embeddings)
 res = []
-for i in range(10000):
+for i in range(1000):
     res.append(utils.run_episode(embeddings, test_labels, p["N_WAY"], p["K_SHOT"]))
 mn = np.mean(res)
 std = np.std(res)
 print(f"Euclidean nearest centroid: {mn*100}+/-{std*100}% correct.")
 
-res = []
-for i in range(10000):
-    res.append(utils.run_episode_linear(embeddings, test_labels, p["N_WAY"], p["K_SHOT"]))
-mn = np.mean(res)
-std = np.std(res)
-print(f"Logistic regression: {mn*100}+/-{std*100}% correct.")
+#res = []
+#for i in range(1000):
+#    res.append(utils.run_episode_linear(embeddings, test_labels, p["N_WAY"], p["K_SHOT"]))
+#mn = np.mean(res)
+#std = np.std(res)
+#print(f"Logistic regression: {mn*100}+/-{std*100}% correct.")
     
 res = []
-for i in range(10000):
+for i in range(1000):
     res.append(utils.run_episode_cosine(embeddings, test_labels, p["N_WAY"], p["K_SHOT"]))
 mn = np.mean(res)
 std = np.std(res)
