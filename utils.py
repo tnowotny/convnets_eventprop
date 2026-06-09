@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow_datasets as tfds
 import cv2
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
 
 def show_filters(w, fshape):
     fh, fw = fshape
@@ -161,7 +163,6 @@ def load_omniglot(split="train"):
 
     print(f"[Omniglot] Loaded {len(images)} samples from {split}")
     print(f"           Classes={len(np.unique(labels))}")
-    print(images[0].shape)
     return np.asarray(images), labels, alph_ids, char_ids
 
 
@@ -193,6 +194,23 @@ def stratified_split(images, labels, alph_ids, alphabets = None, val_split=0.1):
 def augment(images, aug):
     new_img = np.squeeze(images.copy())
     shape = new_img[0].shape
+    zoom = aug.get("zoom")
+    if zoom is not None:
+        ht = new_img[0].shape[0]
+        wd = new_img[0].shape[1]
+        base = np.zeros((ht,wd))
+        for i, img in enumerate(new_img):
+            fac = np.random.uniform(zoom[0], zoom[1])
+            new_ht = int(ht * fac)
+            new_wd = int(wd * fac)
+            x = int(abs(new_wd-wd)/2)
+            y = int(abs(new_ht-ht)/2)
+            img_l = cv2.resize(img, (new_wd,new_ht), interpolation=cv2.INTER_LINEAR)
+            if fac > 1:
+                new_img[i] = img_l[y:y+ht,x:x+wd]
+            else:
+                new_img[i] = base
+                new_img[i][y:y+new_ht,x:x+new_wd]= img_l
     rot = aug.get("rotate")
     if rot is not None:
         image_center = tuple(np.array(new_img[0].shape[1::-1]) / 2)
@@ -251,28 +269,24 @@ def show_examples(images, labels, the_label):
 
 def predictions_from_vAvg(vAvg):
     vAvg = np.asarray(vAvg)
-    print(vAvg.shape)
     preds = np.argmax(vAvg[:,-1:,:],axis=-1)
-    print(preds.shape)
     return np.squeeze(preds)
 
 
-def extract_embeddings(compiled_net, input, test_img, layer):
+def extract_embeddings(compiled_net, input, output, test_img, layer, batch_size, var):
     """Load final checkpoint, run inference, return membrane voltage embeddings."""
     print(f"Extracting embeddings")
     with compiled_net:
-        print("loaded")
-        n_batches = int(np.ceil(len(test_img) / BATCH_SIZE))
+        n_batches = int(np.ceil(len(test_img) / batch_size))
         all_embeddings = []
         pops = compiled_net.genn_model.neuron_populations
-        the_pop = pops[layer.population()]
-        for batch_idx, start in enumerate(range(0, len(test_img), BATCH_SIZE)):
-            batch_img = test_img[start : start + BATCH_SIZE]
+        the_pop = pops[layer]
+        for batch_idx, start in enumerate(range(0, len(test_img), batch_size)):
+            batch_img = test_img[start : start + batch_size]
             n = len(batch_img)
-            print("predicting")
-            compiled_net.predict({input: batch_img})
-            the_pop["v"].pull_from_device()
-            all_embeedings.append(the_pop["v"].values())
+            compiled_net.evaluate({input: batch_img},{output: np.zeros(batch_img.shape[0])},callbacks=[])
+            the_pop.vars[var].pull_from_device()
+            all_embeddings.append(the_pop.vars[var].values)
         embeddings = np.concatenate(all_embeddings, axis=0)
         norms = np.linalg.norm(embeddings, axis=1)
         print(f"Done: shape {embeddings.shape}, "
@@ -295,18 +309,18 @@ def sample_episode(embeddings, labels, n_way, k_shot):
     qry_emb, qry_lb = [], []
     for new_lbl, cls in enumerate(classes):
         idx = np.where(labels == cls)[0]
-        sup_emb.append(embeddings[idx[:k_shot]])
+        sup_emb.extend(embeddings[idx[:k_shot]])
         sup_lb += [new_lbl] * k_shot
-        qry_emb.append(embeddings[idx[k_shot:]])
-        qry_lb += [new_lbl] * len(qry_emb)
+        qry_emb.extend(embeddings[idx[k_shot:]])
+        qry_lb += [new_lbl] * len(idx[k_shot:])
 
-    return sup_emb, np.array(sup_lb), qry_emb, np.array(qry_lb)
+    return np.asarray(sup_emb), np.array(sup_lb), np.asarray(qry_emb), np.array(qry_lb)
 
 
 def run_episode(embeddings, labels, n_way, k_shot):
     """One episode: Euclidean nearest-centroid classifier."""
     sup_emb, sup_lb, qry_emb, qry_lb = sample_episode(embeddings, labels,n_way, k_shot)
-    prototypes = np.array([sup_emb[sup_lb == c].mean(0) for c in range(N_WAY)])
+    prototypes = np.array([sup_emb[sup_lb == c].mean(0) for c in range(n_way)])
     dists = ((qry_emb[:, None] - prototypes[None]) ** 2).sum(-1)
     return (np.argmin(dists, axis=1) == qry_lb).mean()
 
