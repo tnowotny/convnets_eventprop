@@ -45,7 +45,8 @@ p = {
     "SHUFFLE": True,
     "RECORD_CONFUSION": False,
     "HEADLESS": True,
-    "TRAINING_ROTATION": True
+    "TRAINING_ROTATION": True,
+    "SIGNED": False
 }
 
 if len(sys.argv) > 1:
@@ -62,12 +63,16 @@ with open(f"{p['NAME']}_run.json","w") as f:
 
 
 images, labels, alph_ids, char_ids = utils.load_omniglot("train") 
+if p["SIGNED"]:
+    images = np.minimum((images-127.5)*2,255)
 train_img, train_labels, val_img, val_labels = utils.stratified_split(images, labels, alph_ids, p["ALPHABETS"])
 if p["TRAINING_ROTATION"]:
     train_img, train_labels = utils.ninety_degree_augmentation(train_img, train_labels)
     val_img, val_labels = utils.ninety_degree_augmentation(val_img, val_labels)
     
 val_img = utils.rescale(val_img)
+
+
     
 serialiser = Numpy(f"{p['NAME']}_checkpoints")
 network = SequentialNetwork()
@@ -75,7 +80,7 @@ NUM_OUTPUT = len(np.unique(train_labels))
 
 with network:
     # Populations
-    input = InputLayer(LatencyInput("linear", p["EXAMPLE_TIME"] - (2.0 * p["DT"]), 2.0 * p["DT"], 1, False),
+    input = InputLayer(LatencyInput("linear", p["EXAMPLE_TIME"] - (2.0 * p["DT"]), 2.0 * p["DT"], 1, p["SIGNED"]),
                        (28, 28, 1), name="input",record_spikes= True)   
     hidden = []
     for nh in range(p["HIDDEN_LAYERS"]):
