@@ -149,7 +149,7 @@ def load_omniglot(split="train"):
     char_ids = []
 
     # Load full dataset (split == "train" or == "test")
-    ds = tfds.load("omniglot", split=split, shuffle_files=False)
+    ds = tfds.load("omniglot", data_dir="../tfds_data",split=split, shuffle_files=False)
 
     # Convert TFDS tensors to numpy
     for x in ds.as_numpy_iterator():

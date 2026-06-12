@@ -96,7 +96,7 @@ compiler = EventPropCompiler(example_timesteps=max_example_timesteps,
                              batch_size=p["BATCH_SIZE"], kernel_profiling=p["KERNEL_PROFILING"])
 optimisers = {hidden[nh]: {"weight": Adam(p["LR"][nh])} for nh in range(p["HIDDEN_LAYERS"])}
 optimisers[output] = {"weight": Adam(p["LR"][-1])}
-compiled_net = compiler.compile(network, optimisers=optimisers, regularisers={"all_hidden_populations": SpikeCount(strength=p["REG_STRENGTH"],target=p["REG_TARGET"])})
+compiled_net = compiler.compile(network, name=p["NAME"], optimisers=optimisers, regularisers={"all_hidden_populations": SpikeCount(strength=p["REG_STRENGTH"],target=p["REG_TARGET"])})
 with compiled_net:
     start_time = perf_counter()
     #callbacks = ["batch_progress_bar", Checkpoint(serialiser)]
