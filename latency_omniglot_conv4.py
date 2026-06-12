@@ -73,7 +73,6 @@ if p["TRAINING_ROTATION"]:
 val_img = utils.rescale(val_img)
 
 
-    
 serialiser = Numpy(f"{p['NAME']}_checkpoints")
 network = SequentialNetwork()
 NUM_OUTPUT = len(np.unique(train_labels))
