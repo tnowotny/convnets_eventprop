@@ -41,12 +41,12 @@ p = {
     "SHOW_AUGMENTAION_EXAMPLE": False,
     "REG_STRENGTH":(1e-4,1e-6),
     "REG_TARGET": 0.1,
-    "NAME": "conv4_test_4",
+    "NAME": "conv4_test_5",
     "SHUFFLE": True,
     "RECORD_CONFUSION": False,
     "HEADLESS": True,
     "TRAINING_ROTATION": True,
-    "SIGNED": False
+    "SIGNED": True
 }
 
 if len(sys.argv) > 1:
