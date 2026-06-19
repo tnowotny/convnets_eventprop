@@ -30,10 +30,10 @@ p = {
     "CONV_STRIDES": [ 2, 1, 1, 1 ],
     "HID_MEAN": [ 1.0, 0.0, 0.0, 0.0 ],
     "HID_SD": [3.0, 1.0, 1.0, 1.0 ],
-    "N_WAY": 20,
+    "N_WAY": 5,
     "K_SHOT": 5,
-    "EMBEDDING_NAME": "scan_OMNI_0/J0_6_checkpoints/",
-    "TRAINING_ROTATION": True
+    "EMBEDDING_NAME": "scan_OMNI_0/J0_16_checkpoints",
+    "TRAINING_ROTATION": False
 }
 
 if p["TRAINING_ROTATION"]:
