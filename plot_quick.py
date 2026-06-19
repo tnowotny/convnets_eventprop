@@ -2,8 +2,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 
-d = np.loadtxt(sys.argv[1])
-Nplots = d.shape[1]
+d = []
+for i in range(len(sys.argv)-1):
+    d.append(np.loadtxt(sys.argv[i+1]))
+
+print(len(d))
+Nplots = d[0].shape[1]
 if Nplots > 1:
     ploth = int(np.sqrt(Nplots))
     plotw = (Nplots-1)//ploth + 1
@@ -18,6 +22,7 @@ else:
     twoD = False
     oneD = False
     
+
 for i in range(ploth):
     for j in range(plotw):
         id = i*plotw+j
@@ -28,7 +33,8 @@ for i in range(ploth):
         else:
             the_ax = ax
         if id < Nplots:
-            the_ax.plot(d[:,id])
+            for pl in range(len(d)):
+                the_ax.plot(d[pl][:,id])
         else:
             the_ax.set_visible(False)
     

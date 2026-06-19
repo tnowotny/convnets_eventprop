@@ -32,7 +32,7 @@ p = {
     "HID_SD": [3.0, 1.0, 1.0, 1.0 ],
     "N_WAY": 20,
     "K_SHOT": 5,
-    "EMBEDDING_NAME": "conv4_test_4_checkpoints",
+    "EMBEDDING_NAME": "scan_OMNI_0/J0_6_checkpoints/",
     "TRAINING_ROTATION": True
 }
 
