@@ -46,7 +46,7 @@ p = {
     "RECORD_CONFUSION": False,
     "HEADLESS": True,
     "TRAINING_ROTATION": True,
-    "SIGNED": True
+    "SIGNED": False
 }
 
 if len(sys.argv) > 1:
