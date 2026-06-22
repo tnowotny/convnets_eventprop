@@ -5,6 +5,7 @@ import cv2
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from ml_genn.callbacks import VarRecorder
+from ml_genn.utils.value import set_values
 
 def show_filters(w, fshape):
     fh, fw = fshape
@@ -309,7 +310,6 @@ def extract_detailed_embeddings(compiled_net, input, output, test_img, layer, ba
             all_embeddings.extend(cb_data["v_emb"])
         embeddings = np.asarray(all_embeddings)
         embeddings = embeddings.reshape((-1,embeddings.shape[1]*embeddings.shape[2]))
-        print(embeddings.shape)
         norms = np.linalg.norm(embeddings, axis=1)
         print(f"Done: shape {embeddings.shape}, "
               f"norm mean={norms.mean():.3f} std={norms.std():.3f} "
@@ -388,3 +388,9 @@ def ninety_degree_augmentation(img, lbl):
     return np.asarray(img+new_img), np.asarray(lbl+new_lbl)
     
     
+def load_chopped(hid, network, serialiser, keys):
+    for h in hid:
+        c = h.connection()
+        state = serialiser.deserialise_all(keys + (c,))
+        set_values(c.connectivity, state)
+    return network
