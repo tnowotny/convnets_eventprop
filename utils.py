@@ -6,6 +6,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from ml_genn.callbacks import VarRecorder
 from ml_genn.utils.value import set_values
+import os
 
 def show_filters(w, fshape):
     fh, fw = fshape
@@ -169,7 +170,7 @@ def load_omniglot(split="train"):
 
 
 def stratified_split(images, labels, alph_ids, alphabets = None, val_split=0.1):
-    train_idx, val_idx = [], []    
+    train_idx, val_idx = [], []
     img = np.asarray(images)
     lbl = np.asarray(labels)
     aids = np.asarray(alph_ids)
@@ -193,6 +194,22 @@ def stratified_split(images, labels, alph_ids, alphabets = None, val_split=0.1):
         train_idx.extend(idx[n_val:])
     return img[train_idx], lbl[train_idx], img[val_idx], lbl[val_idx]
 
+def simple_strat_split(images, labels, val_split=0.1):
+    train_idx, val_idx = [], []
+    img = np.asarray(images)
+    lbl = np.asarray(labels)
+    rng = np.random.default_rng()
+    uniq = np.unique(lbl)
+    remap = {u: i for i, u in enumerate(uniq)}
+    lbl = np.vectorize(remap.get)(lbl)
+    for c in np.unique(lbl):
+        idx = np.where(lbl == c)[0]
+        rng.shuffle(idx)
+        n_val = max(1, int(len(idx) * val_split))
+        val_idx.extend(idx[:n_val])
+        train_idx.extend(idx[n_val:])
+    return img[train_idx], lbl[train_idx], img[val_idx], lbl[val_idx]
+
 def augment(images, aug):
     new_img = np.squeeze(images.copy())
     shape = new_img[0].shape
@@ -200,7 +217,7 @@ def augment(images, aug):
     if zoom is not None:
         ht = new_img[0].shape[0]
         wd = new_img[0].shape[1]
-        base = np.zeros((ht,wd))
+        base = np.zeros(new_img[0].shape)
         for i, img in enumerate(new_img):
             fac = np.random.uniform(zoom[0], zoom[1])
             new_ht = int(ht * fac)
@@ -228,11 +245,54 @@ def augment(images, aug):
             new_img[i] = cv2.warpAffine(img, shift_mat, shape[1::-1])
     return np.expand_dims(new_img, axis=-1)
 
+def augment_mini_imagenet(images, aug):
+    new_img = images.copy()
+    shape = new_img[0].shape
+
+    zoom = aug.get("zoom")
+    if zoom is not None:
+        ht = new_img[0].shape[0]
+        wd = new_img[0].shape[1]
+        base = np.zeros(new_img[0].shape)
+        for i, img in enumerate(new_img):
+            fac = np.random.uniform(zoom[0], zoom[1])
+            new_ht = int(ht * fac)
+            new_wd = int(wd * fac)
+            x = int(abs(new_wd-wd)/2)
+            y = int(abs(new_ht-ht)/2)
+            img_l = cv2.resize(img, (new_wd,new_ht), interpolation=cv2.INTER_LINEAR)
+            if fac > 1:
+                new_img[i] = img_l[y:y+ht,x:x+wd]
+            else:
+                new_img[i] = base
+                new_img[i][y:y+new_ht,x:x+new_wd]= img_l
+    rot = aug.get("rotate")
+    if rot is not None:
+        image_center = tuple(np.array(new_img[0].shape[1::-1]) / 2)
+        for i, img in enumerate(new_img):
+            angle = np.random.uniform(rot[0], rot[1])
+            rot_mat = cv2.getRotationMatrix2D(image_center, angle, 1.0)
+            new_img[i] = cv2.warpAffine(img, rot_mat, shape[1::-1], flags=cv2.INTER_LINEAR)
+    shift = aug.get("shift")
+    if shift is not None:
+        for i,img in enumerate(new_img):
+            the_shift = np.random.uniform(shift[0],shift[1],2)
+            shift_mat = np.asarray([[ 1, 0, the_shift[0]], [ 0, 1, the_shift[1]]])
+            new_img[i] = cv2.warpAffine(img, shift_mat, shape[1::-1])
+    return new_img
+
+
 def rescale(images):
     new_img = []
     for img in images:
         new_img.append(cv2.resize(img, (28,28), interpolation=cv2.INTER_LINEAR))
     return np.expand_dims(np.asarray(new_img),axis=-1)
+
+def rescale_3(images,size):
+    new_img = []
+    for img in images:
+        new_img.append(cv2.resize(img, size, interpolation=cv2.INTER_LINEAR))
+    return np.asarray(new_img)
 
 def show_examples(images, labels, the_label):
     img = np.asarray(images)[np.asarray(labels) == the_label]
@@ -394,3 +454,12 @@ def load_chopped(hid, network, serialiser, keys):
         state = serialiser.deserialise_all(keys + (c,))
         set_values(c.connectivity, state)
     return network
+
+
+def load_mini_imagenet(split):
+    bname = os.path.expanduser("~/data/mini_imagenet/")
+    fname = bname+"images_"+split+".npy"
+    d = np.load(fname)
+    fname = bname+"labels_"+split+".npy"
+    labels =  np.load(fname)
+    return d, labels
