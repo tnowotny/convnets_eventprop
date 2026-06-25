@@ -18,7 +18,6 @@ from time import perf_counter
 import utils
 
 p = {
-    "NUM_INPUT": 784,
     "NUM_OUTPUT": 964,
     "BATCH_SIZE": 32,
     "EXAMPLE_TIME": 25.0,
@@ -32,17 +31,22 @@ p = {
     "HID_SD": [3.0, 1.0, 1.0, 1.0 ],
     "N_WAY": 5,
     "K_SHOT": 5,
-    "EMBEDDING_NAME": "scan_OMNI_0/J0_16_checkpoints",
+    "NAME": "scan_OMNI_0/J0_16",
     "TRAINING_ROTATION": False
 }
 
 if p["TRAINING_ROTATION"]:
     p["NUM_OUTPUT"] *= 4
 
+if len(sys.argv) > 1:
+    p["NAME"] = sys.argv[1]
+p["EMBEDDING_NAME"] = p["NAME"]+"_checkpoints"
+
 images, test_labels, alph_ids, char_ids = utils.load_omniglot("test")
 test_img = utils.rescale(images)
 
 serialiser = Numpy(p["EMBEDDING_NAME"])
+print(f"serialiser: {p['EMBEDDING_NAME']}")
 network = SequentialNetwork()
 
 with network:
@@ -76,6 +80,9 @@ for i in range(1000):
 mn = np.mean(res)
 std = np.std(res)
 print(f"Euclidean nearest centroid: {mn*100}+/-{std*100}% correct.")
+print(f"output file: {p['NAME']+'_fewshot_results.txt'}")
+f = open(p["NAME"]+"_fewshot_results.txt","a")
+f.write(f"{mn} {std} ")
 
 #res = []
 #for i in range(1000):
@@ -90,4 +97,5 @@ for i in range(1000):
 mn = np.mean(res)
 std = np.std(res)
 print(f"Cosine nearest centroid: {mn*100}+/-{std*100}% correct.")
-    
+f.write(f"{mn} {std}\n")
+f.close()

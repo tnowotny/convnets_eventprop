@@ -279,6 +279,12 @@ def augment_mini_imagenet(images, aug):
             the_shift = np.random.uniform(shift[0],shift[1],2)
             shift_mat = np.asarray([[ 1, 0, the_shift[0]], [ 0, 1, the_shift[1]]])
             new_img[i] = cv2.warpAffine(img, shift_mat, shape[1::-1])
+    dropout = aug.get("dropout")
+    if dropout is not None:
+        zeros = np.zeros(new_img[0].shape)
+        for i,img in enumerate(new_img):
+            rnd = np.random.uniform(0,1,img.shape)
+            new_img[i] = np.where(rnd < dropout, zeros, img)
     return new_img
 
 

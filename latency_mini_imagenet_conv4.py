@@ -19,7 +19,7 @@ from time import perf_counter
 import utils
 
 p = {
-    "INPUT_SIZE": (112,112),
+    "INPUT_SIZE": (84,84),
     "BATCH_SIZE": 32,
     "NUM_EPOCHS": 2000,
     "EXAMPLE_TIME": 25.0,
@@ -34,14 +34,14 @@ p = {
     "HID_SD": [3.0, 1.0, 1.0, 1.0 ],
     "LR": [5e-3, 5e-3, 5e-3, 5e-3, 2e-3 ],
     "ALPHABETS": None,
-    "AUG": {"rotate": (-10.0,10.0), "shift": (-4,4), "zoom": (0.9,1.1)},
-    "SHOW_AUGMENTAION_EXAMPLE": True,
+    "AUG": {"rotate": (-15.0,15.0), "shift": (-25,25), "zoom": (0.8,1.2)},
+    "SHOW_AUGMENTAION_EXAMPLE": False,
     "REG_STRENGTH":(1e-4,1e-6),
     "REG_TARGET": 0.1,
-    "NAME": "conv4_test_6",
+    "NAME": "conv4_test_9",
     "SHUFFLE": True,
     "RECORD_CONFUSION": False,
-    "HEADLESS": False,
+    "HEADLESS": True,
     "TRAINING_ROTATION": False,
     "SIGNED": False
 }
