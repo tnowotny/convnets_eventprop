@@ -39,8 +39,8 @@ p = {
        "shift": (-15, 15)
        },
     "SHOW_AUGMENTAION_EXAMPLE": False,
-    "REG_STRENGTH":(1e-4,1e-6),
-    "REG_TARGET": 0.1,
+    "REG_STRENGTH": [ (1e-4,1e-6), (2e-4,2e-6), (5e-4,5e-6), (1e-3,1e-5)],
+    "REG_TARGET": [ 0.1, 0.1, 0.1, 0.1 ],
     "NAME": "conv4_test_5",
     "SHUFFLE": True,
     "RECORD_CONFUSION": False,
@@ -100,7 +100,8 @@ compiler = EventPropCompiler(example_timesteps=max_example_timesteps,
                              batch_size=p["BATCH_SIZE"], kernel_profiling=p["KERNEL_PROFILING"])
 optimisers = {hidden[nh]: {"weight": Adam(p["LR"][nh])} for nh in range(p["HIDDEN_LAYERS"])}
 optimisers[output] = {"weight": Adam(p["LR"][-1])}
-compiled_net = compiler.compile(network, name=p["NAME"], optimisers=optimisers, regularisers={"all_hidden_populations": SpikeCount(strength=p["REG_STRENGTH"],target=p["REG_TARGET"])})
+regularisers = {hidden[nh]: SpikeCount(strength=p["REG_STRENGTH"][nh],target=p["REG_TARGET"][nh]) for nh in range(p["HIDDEN_LAYERS"])}
+compiled_net = compiler.compile(network, name=p["NAME"], optimisers=optimisers, regularisers=regularisers)
 with compiled_net:
     start_time = perf_counter()
     #callbacks = ["batch_progress_bar", Checkpoint(serialiser)]

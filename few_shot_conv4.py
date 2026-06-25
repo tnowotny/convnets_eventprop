@@ -29,8 +29,8 @@ p = {
     "CONV_STRIDES": [ 2, 1, 1, 1 ],
     "HID_MEAN": [ 1.0, 0.0, 0.0, 0.0 ],
     "HID_SD": [3.0, 1.0, 1.0, 1.0 ],
-    "N_WAY": 5,
-    "K_SHOT": 5,
+    "N_WAY": 20,
+    "K_SHOT": 1,
     "NAME": "scan_OMNI_0/J0_16",
     "TRAINING_ROTATION": False
 }
