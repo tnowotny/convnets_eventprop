@@ -131,7 +131,6 @@ for rep in range(p["NUM_REPS"]):
                                                  num_epochs=1, start_epoch=e,
                                                  shuffle=p["SHUFFLE"],
                                                  callbacks=callbacks)
-            print(f"{metrics[output].result}")
             if not p["HEADLESS"] and e % p["PLOT_EPOCHS"] == 0:
                 if p["RECORD_CONFUSION"]:
                     n = len(np.unique(train_lbl))
@@ -160,7 +159,7 @@ for rep in range(p["NUM_REPS"]):
             f.close()
         compiled_net.save((0,),serialiser2)
     network.load((0,), serialiser2)
-    compiled_net = Inferencecompiler.compile(network)
+    compiled_net = Inferencecompiler.compile(network,name=p["NAME"])
     with compiled_net:
         metrics, cb_data = compiled_net.evaluate({input: qry_img},{output: qry_lbl},callbacks=[])
     print(f"Test accuracy: {metrics[output].result}")
