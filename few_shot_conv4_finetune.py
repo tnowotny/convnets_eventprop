@@ -32,13 +32,12 @@ p = {
     "CONV_STRIDES": [ 2, 1, 1, 1 ],
     "HID_MEAN": [ 1.0, 0.0, 0.0, 0.0 ],
     "HID_SD": [3.0, 1.0, 1.0, 1.0 ],
-    "LR": [5e-3, 5e-3, 5e-3, 5e-3, 2e-3 ],
     "ALPHABETS": None,
     "AUG": {"zoom": (0.8,1.2),
        "rotate": (-10.0,10.0),
        "shift": (-15, 15)
        },
-    "SHOW_AUGMENTAION_EXAMPLE": False,
+    "SHOW_AUGMENTATION_EXAMPLE": False,
     "REG_STRENGTH":(1e-4,1e-6),
     "REG_TARGET": 0.1,
     "NAME": "scan_OMNI_0/J0_16",
@@ -49,7 +48,7 @@ p = {
     "SIGNED": False,
     "NUM_REPS": 50,
     "N_WAY": 5,
-    "K_SHOT": 5
+    "K_SHOT": 5  
 }
 
 if len(sys.argv) > 1:
@@ -60,6 +59,9 @@ if len(sys.argv) > 1:
     for (name,value) in p0.items():
         p[name]= value
 
+p["LR"] = [0 , 0, 0, 0, 2e-3 ]    # define the type of fine-tuning here
+p["BATCH_SIZE"] = 2               # necessary as few-shot has very few examples and batch 0
+                                  # doesn't learn in Eventprop
 serialiser = Numpy(f"{p['NAME']}_checkpoints")
 p["NAME"] = p["NAME"] + "_finetune"
 serialiser2 = Numpy(f"{p['NAME']}_checkpoints")
@@ -96,7 +98,12 @@ compiler = EventPropCompiler(example_timesteps=max_example_timesteps,
                              losses="sparse_categorical_crossentropy",
                              batch_size=p["BATCH_SIZE"], kernel_profiling=p["KERNEL_PROFILING"])
 optimisers = {output:  {"weight": Adam(p["LR"][-1])}}
-#optimisers = {"all_connections": {"weight": Adam(p["LR"][-1])}}
+for nh in range(p["HIDDEN_LAYERS"]):
+    if p["LR"][nh] > 0:
+        optimisers[hidden[nh]] = {"weight": Adam(p["LR"][nh])}
+    #optimisers = {"all_connections": {"weight": Adam(p["LR"][-1])}}
+
+print(f"Optimisers: {optimisers}")
 Inferencecompiler = InferenceCompiler(evaluate_timesteps=max_example_timesteps,
                                       reset_in_syn_between_batches=True,
                                       batch_size=p["BATCH_SIZE"])
@@ -118,7 +125,7 @@ for rep in range(p["NUM_REPS"]):
         for e in range(p["NUM_EPOCHS"]):
             the_img = utils.augment(train_img, p["AUG"])
             the_img = utils.rescale(the_img)
-            if not p["HEADLESS"] and p["SHOW_AUGMENTAION_EXAMPLE"]:
+            if not p["HEADLESS"] and p["SHOW_AUGMENTATION_EXAMPLE"]:
                 for i in range(min(10,len(train_img))):
                     fig,ax = plt.subplots(1,2)
                     ax[0].imshow(train_img[i])
@@ -150,16 +157,9 @@ for rep in range(p["NUM_REPS"]):
                     utils.plot_var(grad[-1]) 
                     utils.spike_raster(cb_data, f"shid{nh}")
                 plt.show()
-            f = open(f"{p['NAME']}_results.txt","a")
-            f.write(f"{e} ")
-            for nh in range(p["HIDDEN_LAYERS"]):
-                smean,ssig,sallmean,sallsig = utils.spike_stats(hidden[nh],cb_data,f"shid{nh}")
-                f.write(f"{smean} {ssig} {sallmean} {sallsig} ")
-            f.write(f"{metrics[output].result}\n")
-            f.close()
         compiled_net.save((0,),serialiser2)
     network.load((0,), serialiser2)
-    compiled_net = Inferencecompiler.compile(network)
+    compiled_net = Inferencecompiler.compile(network,name=p["NAME"])
     with compiled_net:
         metrics, cb_data = compiled_net.evaluate({input: qry_img},{output: qry_lbl},callbacks=[])
     print(f"Test accuracy: {metrics[output].result}")
@@ -177,4 +177,9 @@ for rep in range(p["NUM_REPS"]):
         print(f"Softmax2 time = {compiled_net.genn_model.get_custom_update_time('BatchSoftmax2')}")
         print(f"Softmax3 time = {compiled_net.genn_model.get_custom_update_time('BatchSoftmax3')}")
 
-print(f"Avg Test: {np.mean(all_test)} +/- {np.std(all_test)}")
+mn = np.mean(all_test)
+std = np.std(all_test)
+f = open(p["NAME"]+"_results.txt","a")
+f.write(f"{p['N_WAY']} {p['K_SHOT']} {mn} {std}\n")
+f.close()
+print(f"Avg Test: {mn} +/- {std}")

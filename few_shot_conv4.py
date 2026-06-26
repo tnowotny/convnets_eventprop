@@ -1,5 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import sys
+import json
 
 from ml_genn import InputLayer, Layer, SequentialNetwork
 from ml_genn.callbacks import Checkpoint, SpikeRecorder, VarRecorder, ConnVarRecorder
@@ -30,16 +32,22 @@ p = {
     "HID_MEAN": [ 1.0, 0.0, 0.0, 0.0 ],
     "HID_SD": [3.0, 1.0, 1.0, 1.0 ],
     "N_WAY": 20,
-    "K_SHOT": 1,
+    "K_SHOT": 5,
     "NAME": "scan_OMNI_0/J0_16",
     "TRAINING_ROTATION": False
 }
 
+if len(sys.argv) > 1:
+    fname= f"{sys.argv[1]}.json"
+    with open(fname,"r") as f:
+        p0= json.load(f)
+
+    for (name,value) in p0.items():
+        p[name]= value
+
 if p["TRAINING_ROTATION"]:
     p["NUM_OUTPUT"] *= 4
 
-if len(sys.argv) > 1:
-    p["NAME"] = sys.argv[1]
 p["EMBEDDING_NAME"] = p["NAME"]+"_checkpoints"
 
 images, test_labels, alph_ids, char_ids = utils.load_omniglot("test")
@@ -82,7 +90,7 @@ std = np.std(res)
 print(f"Euclidean nearest centroid: {mn*100}+/-{std*100}% correct.")
 print(f"output file: {p['NAME']+'_fewshot_results.txt'}")
 f = open(p["NAME"]+"_fewshot_results.txt","a")
-f.write(f"{mn} {std} ")
+f.write(f"{p['N_WAY']} {p['K_SHOT']} {mn} {std} ")
 
 #res = []
 #for i in range(1000):
