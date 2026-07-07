@@ -151,7 +151,7 @@ for rep in range(p["NUM_REPS"]):
                     utils.spike_raster(cb_data, f"shid{nh}")
                 plt.show()
             f = open(f"{p['NAME']}_trainresults.txt","a")
-            f.write(f"{e} ")
+            f.write(f"{e} {p['N_WAY']} {p['k_SHOT']} ")
             for nh in range(p["HIDDEN_LAYERS"]):
                 smean,ssig,sallmean,sallsig = utils.spike_stats(hidden[nh],cb_data,f"shid{nh}")
                 f.write(f"{smean} {ssig} {sallmean} {sallsig} ")
