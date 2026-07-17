@@ -463,7 +463,7 @@ def load_chopped(hid, network, serialiser, keys):
 
 
 def load_mini_imagenet(split):
-    bname = os.path.expanduser("~/data/mini_imagenet/")
+    bname = "../data/mini_imagenet/"
     fname = bname+"images_"+split+".npy"
     d = np.load(fname)
     fname = bname+"labels_"+split+".npy"

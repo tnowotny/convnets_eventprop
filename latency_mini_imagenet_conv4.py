@@ -54,7 +54,7 @@ if len(sys.argv) > 1:
     for (name,value) in p0.items():
         p[name]= value
     
-print(p)
+#print(p)
 with open(f"{p['NAME']}_run.json","w") as f:
     json.dump(p,f,indent=4)
 
@@ -71,7 +71,6 @@ if p["TRAINING_ROTATION"]:
     train_img, train_labels = utils.ninety_degree_augmentation(train_img, train_labels)
     val_img, val_labels = utils.ninety_degree_augmentation(val_img, val_labels)
 
-print(val_img[0].shape)
 val_img = utils.rescale_3(val_img,p["INPUT_SIZE"])
 
 
@@ -82,7 +81,7 @@ NUM_OUTPUT = len(np.unique(train_labels))
 with network:
     # Populations
     input = InputLayer(LatencyInput("linear", p["EXAMPLE_TIME"] - (2.0 * p["DT"]), 2.0 * p["DT"], 1, p["SIGNED"]),
-                       p["INPUT_SIZE"]+(3,), name="input",record_spikes= True)   
+                       tuple(p["INPUT_SIZE"])+(3,), name="input",record_spikes= True)
     hidden = []
     for nh in range(p["HIDDEN_LAYERS"]):
         initial_hidden_weight = Normal(mean= p["HID_MEAN"][nh], sd= p["HID_SD"][nh])
