@@ -27,7 +27,7 @@ p = {
     "KERNEL_PROFILING": False,
     "PLOT_EPOCHS": 2000,
     "HIDDEN_LAYERS": 4,
-    "NUM_HIDDEN": [ 64, 64, 64, 64 ],
+    "NUM_HIDDEN": [ 128, 128, 128, 128 ],
     "KERNEL_SZ": [ 3, 3, 3, 3 ],
     "CONV_STRIDES": [ 2, 2, 1, 1 ],
     "HID_MEAN": [ 1.0, 0.0, 0.0, 0.0 ],
@@ -36,14 +36,14 @@ p = {
     "ALPHABETS": None,
     "AUG": {"rotate": (-15.0,15.0), "shift": (-25,25), "zoom": (0.8,1.2)},
     "SHOW_AUGMENTAION_EXAMPLE": False,
-    "REG_STRENGTH":(1e-4,1e-6),
+    "REG_STRENGTH":(1e-4,1e-5),
     "REG_TARGET": 0.1,
-    "NAME": "conv4_test_9",
+    "NAME": "conv4_test_12",
     "SHUFFLE": True,
     "RECORD_CONFUSION": False,
     "HEADLESS": True,
     "TRAINING_ROTATION": False,
-    "SIGNED": False
+    "SIGNED": True
 }
 
 if len(sys.argv) > 1:
@@ -65,7 +65,8 @@ val_img, val_labels = utils.load_mini_imagenet("val")
 images = np.concatenate((train_img,val_img), axis=0)
 labels = np.concatenate((train_labels,val_labels), axis=0)
 if p["SIGNED"]:
-    images = np.minimum((images-127.5)*2,255)
+    for i in range(len(images)):
+        images[i] = np.maximum(-128, np.minimum(127, (images[i]-np.mean(images[i]))/np.std(images[i])*64)).astype(np.int8) 
 train_img, train_labels, val_img, val_labels = utils.simple_strat_split(images, labels)
 if p["TRAINING_ROTATION"]:
     train_img, train_labels = utils.ninety_degree_augmentation(train_img, train_labels)
@@ -116,7 +117,6 @@ with compiled_net:
     val_best = 0.0
     for e in range(p["NUM_EPOCHS"]):
         the_img = utils.augment_mini_imagenet(train_img, p["AUG"])
-        print(the_img[0].shape)
         the_img = utils.rescale_3(the_img,p["INPUT_SIZE"])
         if not p["HEADLESS"] and p["SHOW_AUGMENTAION_EXAMPLE"]:
             for i in range(10):
@@ -159,6 +159,7 @@ with compiled_net:
                 utils.spike_raster(cb_data, f"shid{nh}")
             plt.show()
         with open(f"{p['NAME']}_results.txt","a") as f:
+            f.write(f"{e} ")
             for nh in range(p["HIDDEN_LAYERS"]):
                 smean,ssig,sallmean,sallsig = utils.spike_stats(hidden[nh],cb_data,f"shid{nh}")
                 f.write(f"{smean} {ssig} {sallmean} {sallsig} ")
