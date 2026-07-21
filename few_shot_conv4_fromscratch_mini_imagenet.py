@@ -104,7 +104,7 @@ Inferencecompiler = InferenceCompiler(evaluate_timesteps=max_example_timesteps,
 all_test  = []
 for rep in range(p["NUM_REPS"]):
     train_img, train_lbl, qry_img, qry_lbl = utils.sample_episode(test_img, test_labels, p["N_WAY"], p["K_SHOT"])
-    qry_img = utils.rescale(qry_img)
+    qry_img = utils.rescale_3(qry_img,p["INPUT_SIZE"])
     compiled_net = compiler.compile(network, name=p["NAME"], optimisers=optimisers, regularisers={"all_hidden_populations": SpikeCount(strength=p["REG_STRENGTH"],target=p["REG_TARGET"])})
     with compiled_net:
         start_time = perf_counter()
@@ -117,7 +117,7 @@ for rep in range(p["NUM_REPS"]):
         
         for e in range(p["NUM_EPOCHS"]):
             the_img = utils.augment(train_img, p["AUG"])
-            the_img = utils.rescale(the_img)
+            the_img = utils.rescale_3(the_img,p["INPUT_SIZE"])
             if not p["HEADLESS"] and p["SHOW_AUGMENTATION_EXAMPLE"]:
                 for i in range(min(10,len(train_img))):
                     fig,ax = plt.subplots(1,2)
