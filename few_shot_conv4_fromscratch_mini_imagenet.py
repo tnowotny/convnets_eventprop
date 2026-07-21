@@ -116,7 +116,7 @@ for rep in range(p["NUM_REPS"]):
             callbacks.append(SpikeRecorder(hidden[nh], f"shid{nh}",example_filter=[ 1, 500, 1000, 1500 ]))
         
         for e in range(p["NUM_EPOCHS"]):
-            the_img = utils.augment(train_img, p["AUG"])
+            the_img = utils.augment_mini_imagenet(train_img, p["AUG"])
             the_img = utils.rescale_3(the_img,p["INPUT_SIZE"])
             if not p["HEADLESS"] and p["SHOW_AUGMENTATION_EXAMPLE"]:
                 for i in range(min(10,len(train_img))):
