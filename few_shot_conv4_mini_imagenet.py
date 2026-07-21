@@ -1,5 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import sys
+import json
 
 from ml_genn import InputLayer, Layer, SequentialNetwork
 from ml_genn.callbacks import Checkpoint, SpikeRecorder, VarRecorder, ConnVarRecorder
@@ -36,19 +38,30 @@ p = {
     "TRAINING_ROTATION": False
 }
 
+if len(sys.argv) > 1:
+    fname= f"{sys.argv[1]}.json"
+    with open(fname,"r") as f:
+        p0= json.load(f)
+
+    for (name,value) in p0.items():
+        p[name]= value
+
 if p["TRAINING_ROTATION"]:
     p["NUM_OUTPUT"] *= 4
+
+p["EMBEDDING_NAME"] = p["NAME"]+"_checkpoints"
 
 images, test_labels = utils.load_mini_imagenet("test")
 test_img = utils.rescale_3(images,p["INPUT_SIZE"])
 
 serialiser = Numpy(p["EMBEDDING_NAME"])
+print(f"serialiser: {p['EMBEDDING_NAME']}")
 network = SequentialNetwork()
 
 with network:
     # Populations
     input = InputLayer(LatencyInput("linear", p["EXAMPLE_TIME"] - (2.0 * p["DT"]), 2.0 * p["DT"], 1, False),
-                       p["INPUT_SIZE"]+(3,), name="input",record_spikes= True)   
+                       tuple(p["INPUT_SIZE"])+(3,), name="input",record_spikes= True)   
     hidden = []
     for nh in range(p["HIDDEN_LAYERS"]):
         initial_hidden_weight = Normal(mean= p["HID_MEAN"][nh], sd= p["HID_SD"][nh])
@@ -76,6 +89,9 @@ for i in range(1000):
 mn = np.mean(res)
 std = np.std(res)
 print(f"Euclidean nearest centroid: {mn*100}+/-{std*100}% correct.")
+print(f"output file: {p['NAME']+'_fewshot_results.txt'}")
+f = open(p["NAME"]+"_fewshot_results.txt","a")
+f.write(f"{p['N_WAY']} {p['K_SHOT']} {mn} {std} ")
 
 #res = []
 #for i in range(1000):
@@ -89,5 +105,6 @@ for i in range(1000):
     res.append(utils.run_episode_cosine(embeddings, test_labels, p["N_WAY"], p["K_SHOT"]))
 mn = np.mean(res)
 std = np.std(res)
-print(f"Cosine nearest centroid: {mn*100}+/-{std*100}% correct.")
-    
+print(f"Cosine nearest centroid: {mn*100}+/-{std*100}% correct.")    
+f.write(f"{mn} {std}\n")
+f.close()
