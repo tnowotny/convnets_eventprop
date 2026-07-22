@@ -48,7 +48,7 @@ p = {
     "SIGNED": False,
     "NUM_REPS": 50,
     "N_WAY": 5,
-    "K_SHOT": 5
+    "K_SHOT": 1
 }
 
 if len(sys.argv) > 1:

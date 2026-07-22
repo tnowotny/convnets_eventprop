@@ -32,8 +32,8 @@ p = {
     "CONV_STRIDES": [ 2, 2, 1, 1 ],
     "HID_MEAN": [ 1.0, 0.0, 0.0, 0.0 ],
     "HID_SD": [3.0, 1.0, 1.0, 1.0 ],
-    "N_WAY": 5,
-    "K_SHOT": 5,
+    "N_WAY": 20,
+    "K_SHOT": 1,
     "EMBEDDING_NAME": "conv4_test_9_checkpoints",
     "TRAINING_ROTATION": False
 }
