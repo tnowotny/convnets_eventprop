@@ -15,5 +15,5 @@ for n in range(100):
 afs = np.asarray(afs)
 afs = np.reshape(afs,(afs.shape[0]*afs.shape[1],-1))
 print(afs.shape)
-plot_comparison(afs, "prototype_Euclid",2)
-plot_comparison(afs, "prototype_Cosine",4)
+plot_comparison(base, afs, "prototype_Euclid",2)
+plot_comparison(base, afs, "prototype_Cosine",4)

@@ -4,6 +4,7 @@ import tensorflow_datasets as tfds
 import cv2
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
+from ml_genn import Layer
 from ml_genn.callbacks import VarRecorder
 from ml_genn.utils.value import set_values
 import os
@@ -49,9 +50,15 @@ def show_filters(w, fshape):
                 the_ax.set_visible(False)
     return fig
 
-def get_conn_var(compiled_net, layer, var):
-    conn = layer.connection
-    pop = compiled_net.connection_populations[conn()]
+"""
+Get connection variable from a layer or Connection
+"""
+def get_conn_var(compiled_net, source, var):
+    if isinstance(source, Layer):
+        conn = source.connection()
+    else:
+        conn = source
+    pop = compiled_net.connection_populations[conn]
     pop.vars[var].pull_from_device()
     w = pop.vars[var].values.copy()
     return w
@@ -93,9 +100,14 @@ def spike_raster(cb_data, key, trials= None):
     fig.suptitle(f"layer {key}")
     return fig
 
-def spike_stats(layer, cb_data, key):
+def spike_stats(source, cb_data, key):
+    if isinstance(source, Layer):
+        pop = layer.population()
+    else:
+        pop = source
     ids = cb_data[key][1]
-    shape = layer.population().shape
+    
+    shape = pop.shape
     n_neuron = np.prod(shape)
     n_trial = shape[0]
     spkn = []

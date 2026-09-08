@@ -53,11 +53,10 @@ def gridlines(ax, hti, wdi, split, extra_lines = None):
             ax.plot(np.array(lnsx).T,np.array(lnsy).T,'w',lw= extra_lines["y"]["w"])   
 
 
-def plot_comparison(afs,exp_name,the_col):
+def plot_comparison(base,afs,exp_name,the_col):
     """
     plot comparisons between fews shot data (afs) and pretraining data.
     """
-    base = "scan_OMNI_0/J0_"
     best_val = []
     last_val = []
     sparse = []
@@ -108,6 +107,57 @@ def plot_comparison(afs,exp_name,the_col):
             plot_with_regress(ax[1],sparse_nr,xnr,'C1',[[0.1,0.9],[0.1,1.0]])
             plot_with_regress(ax[2],best_val_r,xr,'C0',[[0.1,1.0],[0.1,1.0]])
             plot_with_regress(ax[2],best_val_nr,xnr,'C1',[[0.1,1.0],[0.1,1.0]])
+            ax[0].set_xlabel("spikes per neuron per trial")
+            ax[1].set_xlabel("spikes per neuron per trial")
+            ax[2].set_xlabel("validation accuracy pre-training")
+            ax[0].set_ylabel("validation accuracy pre-training")
+            ax[1].set_ylabel(f"{way}-way, {shot}-shot test accuracy")
+            ax[2].set_ylabel(f"{way}-way, {shot}-shot test accuracy")
+            for i in range(3):
+                ax[i].spines['top'].set_visible(False)
+                ax[i].spines['right'].set_visible(False)
+            plt.tight_layout()
+            plt.savefig(f"{base}{exp_name}_{way}-way_{shot}-shot.png")
+    plt.show()
+
+def plot_comparison_mini(base,afs,exp_name,the_col):
+    """
+    plot comparisons between fews shot data (afs) and pretraining data.
+    """
+    best_val = []
+    last_val = []
+    sparse = []
+    for n in range(200):
+        fname = base+str(n)+"_results.txt"
+        d = np.loadtxt(fname)
+        best_val.append(np.max(d[:,-1]))
+        last_val.append(d[-1,-1])
+        sparse.append(np.mean(d[-1,:-2:4]))
+        with open(base+str(n)+".json","r") as f:
+            p = json.load(f)
+
+    best_val = np.asarray(best_val)
+    last_val = np.asarray(last_val)
+    sparse = np.asarray(sparse)
+    
+    # exclude any runs where the final results were bad (unstable training) (bottom 10%)
+    bv75= np.percentile(last_val,15)
+    bvr75 = last_val >= bv75
+
+    best_val = best_val[bvr75]
+    sparse = sparse[bvr75]
+
+    abv = np.argmax(best_val)
+
+    for way in [ 5, 20 ]:
+        for shot in [ 1, 5]:
+            fix,ax = plt.subplots(1,3,figsize=(10,3),sharey=True)
+            x = afs[np.logical_and(afs[:,0] == way, afs[:,1] == shot),the_col]
+            #print(x)
+            xr = x[bvr75]
+            plot_with_regress(ax[0],sparse,best_val,'C0',[[0.1,0.9],[0.7,1.0]])
+            plot_with_regress(ax[1],sparse,xr,'C0',[[0.1,0.9],[0.1,1.0]])
+            plot_with_regress(ax[2],best_val,xr,'C0',[[0.1,1.0],[0.1,1.0]])
             ax[0].set_xlabel("spikes per neuron per trial")
             ax[1].set_xlabel("spikes per neuron per trial")
             ax[2].set_xlabel("validation accuracy pre-training")
