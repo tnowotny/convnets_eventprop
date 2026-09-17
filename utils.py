@@ -102,7 +102,7 @@ def spike_raster(cb_data, key, trials= None):
 
 def spike_stats(source, cb_data, key):
     if isinstance(source, Layer):
-        pop = layer.population()
+        pop = source.population()
     else:
         pop = source
     ids = cb_data[key][1]

@@ -20,25 +20,35 @@ from time import perf_counter
 import utils
 
 p = {
-    "INPUT_SIZE": (84,84),
+    "INPUT_SIZE": (28,28,1),
     "BATCH_SIZE": 32,
     "NUM_EPOCHS": 100,
-    "EXAMPLE_TIME": 50.0,
+    "INPUT_TIME": 25.0,
+    "EXAMPLE_TIME": 25.0,
     "DT": 1.0,
     "KERNEL_PROFILING": False,
     "PLOT_EPOCHS": 2000,
     "RES_BLOCKS": 4,
     "N_FILTER": [ 64, 128, 256, 512 ],
-    "HID_MEAN": 0.0,
-    "HID_SD": 1.0,
+    "HID_MEAN": [[ 1.0, 0.0, 0.0 ],
+                 [ 0.0, 0.0, 0.0 ],
+                 [ 0.0, 0.0, 0.0 ],
+                 [ 0.0, 0.0, 0.0 ],
+                 [0.0, 0.0]],
+    "HID_SD": [[ 3.0, 1.0, 1.0 ],
+               [ 1.0, 1.0, 1.0 ],
+               [ 1.0, 1.0, 1.0 ],
+               [ 1.0, 1.0, 1.0 ],
+               [1.0, 1.0]],
     "SKIP_MEAN": 1.0,
     "SKIP_SD": 3.0,
     "LR": 5e-3,
+    "ALPHABETS": None,
     "AUG": {"rotate": (-15.0,15.0), "shift": (-25,25), "zoom": (0.8,1.2)},
     "SHOW_AUGMENTAION_EXAMPLE": False,
     "REG_STRENGTH":(1e-4,1e-5),
     "REG_TARGET": 0.1,
-    "NAME": "resnet12_test_5",
+    "NAME": "omni_resnet12_test_9",
     "SHUFFLE": True,
     "RECORD_CONFUSION": False,
     "HEADLESS": True,
@@ -64,13 +74,14 @@ with open(f"{p['NAME']}_run.json","w") as f:
 makes resnet block, connecting to all prev_pop (list of pops) incoming pops
 and returns the update list of pops, conns, and the "output pops"
 """
-def resblock(pops, conns, n_filter, prev_pop, pool=1, flatten=False):
+def resblock(bn, pops, conns, n_filter, prev_pop, pool=1, flatten=False):
     convs= []
     if pool > 1:
         shape = tuple((x+1)//pool for x in prev_pop[0].shape[:2])+(n_filter,)
     else:
         shape = prev_pop[0].shape[:2]+(n_filter,)    
     the_shape= int(np.prod(shape)) if flatten else shape
+    print(f"the_shape: {the_shape}")
     r = Population(LeakyIntegrateFire(v_thresh=1.0, tau_mem=20.0,), shape=the_shape, name=f"pop{len(pops)}", record_spikes= True)
     pops.append(r)
     c = Population(LeakyIntegrateFire(v_thresh=1.0, tau_mem=20.0,), shape=shape, name=f"pop{len(pops)}", record_spikes= True)
@@ -88,28 +99,29 @@ def resblock(pops, conns, n_filter, prev_pop, pool=1, flatten=False):
         print(pop.shape)
         print(n_filter)
         initial_hidden_weight = Normal(mean= p["SKIP_MEAN"]/N, sd= p["SKIP_SD"]/N)
-        cr = Connection(pop,r,Conv2D(initial_hidden_weight,n_filter,(1,1), flatten=flatten, conv_strides=pool),Exponential(5.0),name=f"c_{pop.name}_{r.name}")
+        cr = Connection(pop,r,Conv2D(initial_hidden_weight,n_filter,(1,1), flatten=flatten, conv_strides=pool,conv_padding="same"),Exponential(5.0),name=f"c_{pop.name}_{r.name}")
         conns.append(cr)
-        initial_hidden_weight = Normal(mean= p["HID_MEAN"]/N, sd= p["HID_SD"]/N)
+        initial_hidden_weight = Normal(mean= p["HID_MEAN"][bn][0]/N, sd= p["HID_SD"][bn][0]/N)
         cc = Connection(pop,convs[0],Conv2D(initial_hidden_weight,n_filter,(3,3),flatten=False,conv_strides=pool,conv_padding="same"),Exponential(5.0),name=f"c_{pop.name}_{convs[0].name}")
         conns.append(cc)
     flat = False
     for i in range(2):
         if i == 1 and flatten:
             flat = True
+        initial_hidden_weight = Normal(mean= p["HID_MEAN"][bn][i+1], sd= p["HID_SD"][bn][i+1])
         cc = Connection(convs[i],convs[i+1],Conv2D(initial_hidden_weight,n_filter,(3,3),flatten=flat, conv_strides=1,conv_padding="same"),Exponential(5.0),name=f"c_{convs[i].name}_{convs[i+1].name}")
         conns.append(cc)
     return pops, conns, [ r, convs[-1] ]
+    #return pops, conns, [ convs[-1] ]
 
 #---------------------------------
-train_img, train_labels = utils.load_mini_imagenet("train") 
-val_img, val_labels = utils.load_mini_imagenet("val")
-
-images = np.concatenate((train_img,val_img), axis=0)
-labels = np.concatenate((train_labels,val_labels), axis=0)
-
-train_img, train_labels, val_img, val_labels = utils.simple_strat_split(images, labels)
-val_img = utils.rescale_3(val_img,p["INPUT_SIZE"])
+images, labels, alph_ids, char_ids = utils.load_omniglot("train") 
+train_img, train_labels, val_img, val_labels = utils.stratified_split(images, labels, alph_ids, p["ALPHABETS"])
+if p["TRAINING_ROTATION"]:
+    train_img, train_labels = utils.ninety_degree_augmentation(train_img, train_labels)
+    val_img, val_labels = utils.ninety_degree_augmentation(val_img, val_labels)
+    
+val_img = utils.rescale(val_img)
 
 if p["LIMIT_BATCH_NO"] is not None:
     train_img = train_img[:32*p["LIMIT_BATCH_NO"]]
@@ -125,22 +137,22 @@ pops = []
 conns = []
 with network:
     # Populations
-    input = Population(LatencyInput("linear", p["EXAMPLE_TIME"] - (2.0 * p["DT"]),
+    input = Population(LatencyInput("linear", p["INPUT_TIME"] - (2.0 * p["DT"]),
                                     2.0 * p["DT"], 1, False),
-                       tuple(p["INPUT_SIZE"])+(3,), name="input",record_spikes= True)
+                       p["INPUT_SIZE"], name="input",record_spikes= True)
     pops.append(input)
     prev = [ input ]
     pool = 1
     for nh in range(p["RES_BLOCKS"]):
         flatten =  nh == p["RES_BLOCKS"]-1 
-        pops, conns, prev = resblock(pops, conns, p["N_FILTER"][nh], prev, pool, flatten)
+        pops, conns, prev = resblock(nh, pops, conns, p["N_FILTER"][nh], prev, pool, flatten)
         pool = 2
     ro = AvgVarExpWeight(window_start = 15, window_end = 60)
     output = Population(LeakyIntegrate(tau_mem=20.0, readout=ro),    
                    NUM_OUTPUT, name="output")
     pops.append(output)
-    for pop in prev:
-        initial_hidden_weight = Normal(mean= p["HID_MEAN"], sd= p["HID_SD"])
+    for i, pop in enumerate(prev):
+        initial_hidden_weight = Normal(mean= p["HID_MEAN"][-1][i], sd= p["HID_SD"][-1][i])
         c = Connection(pop,output,Dense(initial_hidden_weight),Exponential(5.0),name=f"c_{pop.name}_{output.name}")
         conns.append(c)
 
@@ -162,7 +174,7 @@ for co in conns:
     else:
         optimisers[co] = {"weight": Adam(p["LR"])}
         
-compiled_net = compiler.compile(network, name=p["NAME"], optimisers=optimisers, regularisers={"all_hidden_populations": SpikeCount(strength=p["REG_STRENGTH"],target=p["REG_TARGET"])})
+compiled_net = compiler.compile(network, name=p["NAME"], optimisers={"all_connections": {"weight": Adam(p["LR"])}}, regularisers={"all_hidden_populations": SpikeCount(strength=p["REG_STRENGTH"],target=p["REG_TARGET"])})
 with compiled_net:
     start_time = perf_counter()
     #callbacks = ["batch_progress_bar", Checkpoint(serialiser)]
@@ -174,13 +186,13 @@ with compiled_net:
     for pop in pops:
         if pop.name != "output":
             callbacks.append(SpikeRecorder(pop, pop.name, example_filter=[ 0, 1 ]))
-    for co in conns:
-        callbacks.append(ConnStatsRecorder(co, "weight", key=f"{co.name}_w"))
-        callbacks.append(ConnGradRecorder(co, "weightGradient", key=f"{co.name}_grad", example_filter= list(range(32,64))))
+    #for co in conns:
+        #callbacks.append(ConnStatsRecorder(co, "weight", key=f"{co.name}_w"))
+        #callbacks.append(ConnGradRecorder(co, "weightGradient", key=f"{co.name}_grad", example_filter= list(range(32,64))))
     val_best = 0.0
     for e in range(p["NUM_EPOCHS"]):
-        the_img = utils.augment_mini_imagenet(train_img, p["AUG"])
-        the_img = utils.rescale_3(the_img,p["INPUT_SIZE"])
+        the_img = utils.augment(train_img, p["AUG"])
+        the_img = utils.rescale(the_img)
         if not p["HEADLESS"] and p["SHOW_AUGMENTAION_EXAMPLE"]:
             for i in range(10):
                 fig,ax = plt.subplots(1,2)
@@ -200,15 +212,15 @@ with compiled_net:
             # save network with best validation accuracy
             val_best = val_metrics[output].result
             compiled_net.save((0,),serialiser)
-        for co in conns:
-            d= np.asarray(cb_data[f"{co.name}_w"])
-            name = f"stats/{co.name}_e{e}_w.npy"
-            np.save(name,d)
-            d= np.asarray(cb_data[f"{co.name}_grad"])
-            h, edg = np.histogram(d, bins=50, density=True)
-            edg = (edg[1:]+edg[:-1])/2
-            name = f"stats/{co.name}_e{e}_grad.npy"
-            np.save(name,np.asarray([h, edg]))
+        #for co in conns:
+            #d= np.asarray(cb_data[f"{co.name}_w"])
+            #name = f"stats/{co.name}_e{e}_w.npy"
+            #np.save(name,d)
+            #d= np.asarray(cb_data[f"{co.name}_grad"])
+            #h, edg = np.histogram(d, bins=50, density=True)
+            #edg = (edg[1:]+edg[:-1])/2
+            #name = f"stats/{co.name}_e{e}_grad.npy"
+            #np.save(name,np.asarray([h, edg]))
         if not p["HEADLESS"] and e % p["PLOT_EPOCHS"] == 0:
             if p["RECORD_CONFUSION"]:
                 for (cbdata, lbls) in zip([cb_data, val_cb_data],[train_labels, val_labels]):
