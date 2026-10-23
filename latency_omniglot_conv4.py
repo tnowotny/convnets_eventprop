@@ -41,7 +41,7 @@ p = {
     "SHOW_AUGMENTAION_EXAMPLE": False,
     "REG_STRENGTH": [ (1e-4,1e-6), (2e-4,2e-6), (5e-4,5e-6), (1e-3,1e-5)],
     "REG_TARGET": [ 0.1, 0.1, 0.1, 0.1 ],
-    "NAME": "conv4_test_5",
+    "NAME": "conv4_test_6",
     "SHUFFLE": True,
     "RECORD_CONFUSION": False,
     "HEADLESS": True,
